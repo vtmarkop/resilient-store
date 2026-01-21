@@ -1,31 +1,35 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis-service
+  name: store-service       # <--- THIS MUST SAY STORE-SERVICE
 spec:
-  ports:
-  - port: 6379
   selector:
-    app: redis-db
+    app: store-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: LoadBalancer
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: redis-db
+  name: store-app           # <--- THIS MUST SAY STORE-APP
   labels:
-    app: redis-db
+    app: store-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: redis-db
+      app: store-app
   template:
     metadata:
       labels:
-        app: redis-db
+        app: store-app
     spec:
       containers:
-      - name: redis
-        image: redis:alpine
+      - name: python-api
+        image: resilient-store:latest
+        imagePullPolicy: Never
         ports:
-        - containerPort: 6379
+        - containerPort: 5000

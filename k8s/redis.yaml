@@ -8,6 +8,18 @@ spec:
   selector:
     app: redis-db
 ---
+# 1. The Request for Storage (The Hard Drive)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,5 +39,15 @@ spec:
       containers:
       - name: redis
         image: redis:alpine
+        # 2. Tell Redis to save every write immediately
+        command: ["redis-server", "--appendonly", "yes"]
         ports:
         - containerPort: 6379
+        # 3. Mount the Hard Drive
+        volumeMounts:
+        - name: redis-storage
+          mountPath: /data
+      volumes:
+      - name: redis-storage
+        persistentVolumeClaim:
+          claimName: redis-pvc
