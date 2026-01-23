@@ -3,7 +3,7 @@ kind: Schedule
 metadata:
   name: kill-redis-schedule
 spec:
-  schedule: "@every 20s"
+  schedule: "@every 1m"
   type: PodChaos
   historyLimit: 5
   concurrencyPolicy: Forbid
