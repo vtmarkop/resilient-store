@@ -1,0 +1,15 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: network-delay
+spec:
+  action: delay
+  mode: one
+  selector:
+    labelSelectors:
+      app: resilience-store
+  delay:
+    latency: "2000ms"
+    correlation: "100"
+    jitter: "0ms"
+  duration: "5m"

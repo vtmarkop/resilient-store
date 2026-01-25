@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cpu-starvation-attack
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app: resilience-store
+  stressors:
+    cpu:
+      workers: 1
+      load: 100
+  duration: "10m"

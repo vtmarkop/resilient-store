@@ -7,7 +7,8 @@ app = Flask(__name__)
 # Connect to Redis. 
 # 'redis-service' is the DNS name Kubernetes gives to the database.
 # socket_connect_timeout=1 ensures we don't hang forever if DB is down.
-r = redis.Redis(host='redis-service', port=6379, db=0, socket_connect_timeout=1)
+# r = redis.Redis(host='redis-service', port=6379, db=0, socket_connect_timeout=1, socket_timeout=1)
+r = redis.Redis(host='redis-service', port=6379, db=0, socket_connect_timeout=1) 
 
 @app.route('/buy', methods=['POST'])
 def buy_item():
