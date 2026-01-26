@@ -7,9 +7,9 @@ spec:
   mode: one
   selector:
     labelSelectors:
-      app: resilience-store
+      app: redis-db       # <--- TARGETING REDIS ONLY
   delay:
     latency: "2000ms"
     correlation: "100"
     jitter: "0ms"
-  duration: "5m"
+  duration: "10m"
