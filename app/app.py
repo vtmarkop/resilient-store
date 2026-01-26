@@ -1,44 +1,57 @@
 import os
 import redis
+import time
+import signal
 from flask import Flask, jsonify
 
 app = Flask(__name__)
 
-# Connect to Redis. 
-# 'redis-service' is the DNS name Kubernetes gives to the database.
-# socket_connect_timeout=1 ensures we don't hang forever if DB is down.
-#r = redis.Redis(host='redis-service', port=6379, db=0, socket_connect_timeout=1) 
-#r = redis.Redis(host='redis-service', port=6379, db=0, socket_connect_timeout=1, socket_timeout=1)
+# Standard Redis connection (We keep the settings, but we don't trust them anymore)
+r = redis.Redis(
+    host='redis-service', 
+    port=6379, 
+    socket_connect_timeout=0.1, 
+    socket_timeout=0.1, 
+    retry_on_timeout=False
+)
 
-# socket_timeout=0.1  -->  If no answer in 100ms, hang up.
-# retry_on_timeout=False --> Do NOT try again. Fail immediately.
-r = redis.Redis(host='redis-service', port=6379, db=0, socket_connect_timeout=0.1, socket_timeout=0.1, retry_on_timeout=False)
+# Define a custom error for our alarm
+class HardTimeoutError(Exception):
+    pass
+
+# The function that runs when the alarm rings
+def handler(signum, frame):
+    raise HardTimeoutError("Hard Deadline Exceeded")
 
 @app.route('/buy', methods=['POST'])
 def buy_item():
-    import time
     start_time = time.time()
-    print(f"--- Attempting Purchase at {start_time} ---", flush=True)
-
+    
+    # 1. Set the Alarm for 0.5 seconds (The Hard Limit)
+    signal.signal(signal.SIGALRM, handler)
+    signal.setitimer(signal.ITIMER_REAL, 0.5)
+    
     try:
-        # Try to decrement stock
+        # 2. Try the dangerous operation
+        print(f"--- Attempting Purchase at {start_time} ---", flush=True)
         stock = r.decr('inventory')
+        
+        # 3. If successful, Disable the Alarm
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        
         return jsonify({"message": "Purchase successful!", "stock_remaining": stock})
 
-    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
-        end_time = time.time()
-        duration = end_time - start_time
-        print(f"!!! FAILED after {duration:.2f} seconds. Error: {e} !!!", flush=True)
-        
-        return jsonify({"error": f"FAST FAIL: Store is temporarily offline. Waited {duration:.2f}s"}), 503
+    except HardTimeoutError:
+        # This catches OUR alarm
+        duration = time.time() - start_time
+        return jsonify({"error": f"CONSISTENT FAIL: Hard Timeout triggered. Waited {duration:.4f}s"}), 503
 
-@app.route('/reset', methods=['POST'])
-def reset_stock():
-    try:
-        r.set('inventory', 100)
-        return jsonify({"message": "Stock reset to 100"})
-    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
-        return jsonify({"error": "Cannot reset stock (Database Down)"}), 503
+    except Exception as e:
+        # This catches any other random error (like the 32s TCP fail if it happens fast enough)
+        signal.setitimer(signal.ITIMER_REAL, 0) # Ensure alarm is off
+        duration = time.time() - start_time
+        return jsonify({"error": f"FAIL: {str(e)}. Waited {duration:.4f}s"}), 503
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # threaded=False is REQUIRED for signal to work
+    app.run(host='0.0.0.0', port=5000, threaded=False)
